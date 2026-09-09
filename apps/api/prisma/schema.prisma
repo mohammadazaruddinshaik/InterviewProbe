@@ -1,0 +1,184 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum InterviewStatus {
+  DRAFT
+  ANALYZING
+  READY
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+enum RepositoryStatus {
+  PENDING
+  CLONING
+  ANALYZING
+  READY
+  FAILED
+}
+
+enum SessionStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum SessionRound {
+  PHONE_SCREEN
+  TECHNICAL
+  SYSTEM_DESIGN
+  BEHAVIORAL
+}
+
+enum QuestionType {
+  CODING
+  CONCEPTUAL
+  SYSTEM_DESIGN
+  BEHAVIORAL
+}
+
+enum QuestionSource {
+  RESUME
+  REPOSITORY
+  GENERATED
+}
+
+model User {
+  id         String      @id @default(uuid()) @db.Uuid
+  name       String
+  email      String      @unique
+  passwordHash String
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  interviews Interview[]
+}
+
+model Interview {
+  id               String            @id @default(uuid()) @db.Uuid
+  userId           String            @db.Uuid
+  title            String
+  status           InterviewStatus   @default(DRAFT)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resume           Resume?
+  repositories     Repository[]
+  candidateProfile CandidateProfile?
+  sessions         InterviewSession[]
+  report           InterviewReport?
+
+  @@index([userId])
+}
+
+model Resume {
+  id         String    @id @default(uuid()) @db.Uuid
+  interviewId String   @unique @db.Uuid
+  fileName   String
+  rawText    String
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  interview  Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+}
+
+model Repository {
+  id            String            @id @default(uuid()) @db.Uuid
+  interviewId   String            @db.Uuid
+  url           String
+  name          String
+  defaultBranch String
+  status        RepositoryStatus  @default(PENDING)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  interview     Interview         @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+
+  @@index([interviewId])
+}
+
+model CandidateProfile {
+  id          String    @id @default(uuid()) @db.Uuid
+  interviewId String    @unique @db.Uuid
+  profileData Json
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  interview   Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+}
+
+model InterviewSession {
+  id          String         @id @default(uuid()) @db.Uuid
+  interviewId String         @db.Uuid
+  round       SessionRound
+  status      SessionStatus  @default(NOT_STARTED)
+  difficulty  Difficulty
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  interview   Interview      @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  questions   Question[]
+
+  @@index([interviewId])
+}
+
+model Question {
+  id         String            @id @default(uuid()) @db.Uuid
+  sessionId  String            @db.Uuid
+  text       String
+  type       QuestionType
+  topic      String
+  difficulty Difficulty
+  source     QuestionSource
+  createdAt  DateTime          @default(now())
+  session    InterviewSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  answer     Answer?
+
+  @@index([sessionId])
+}
+
+model Answer {
+  id         String     @id @default(uuid()) @db.Uuid
+  questionId String     @unique @db.Uuid
+  text       String
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  question   Question   @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  evaluation Evaluation?
+}
+
+model Evaluation {
+  id            String   @id @default(uuid()) @db.Uuid
+  answerId      String   @unique @db.Uuid
+  score         Float
+  correctness   Float
+  depth         Float
+  communication Float
+  feedback      String
+  strengths     Json
+  weaknesses    Json
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  answer        Answer   @relation(fields: [answerId], references: [id], onDelete: Cascade)
+}
+
+model InterviewReport {
+  id           String    @id @default(uuid()) @db.Uuid
+  interviewId  String    @unique @db.Uuid
+  overallScore Float
+  reportData   Json
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  interview    Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+}
